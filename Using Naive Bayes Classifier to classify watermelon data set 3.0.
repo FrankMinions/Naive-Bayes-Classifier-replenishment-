@@ -1,0 +1,164 @@
+"""
+author:@Liu
+"""
+
+from numpy import *
+
+def loadDataSet():
+    #训练数据集
+    watermelonList = [ ['青绿', '蜷缩', '浊响', '清晰', '凹陷', '硬滑'],\
+                    ['乌黑', '蜷缩', '沉闷', '清晰', '凹陷', '硬滑'],\
+                    ['乌黑', '蜷缩', '浊响', '清晰', '凹陷', '硬滑'],\
+                    ['青绿', '稍蜷', '浊响', '清晰', '稍凹', '软粘'],\
+                    ['乌黑', '稍蜷', '浊响', '稍糊', '稍凹', '软粘'],\
+                    ['乌黑', '稍蜷', '浊响', '清晰', '稍凹', '硬滑'],\
+                    ['青绿', '硬挺', '清脆', '清晰', '平坦', '软粘'],\
+                    ['浅白', '蜷缩', '浊响', '模糊', '平坦', '软粘'],\
+                    ['青绿', '稍蜷', '浊响', '稍糊', '凹陷', '硬滑'],\
+                    ['浅白', '稍蜷', '沉闷', '稍糊', '凹陷', '硬滑'],\
+                    ['乌黑', '稍蜷', '浊响', '清晰', '稍凹', '软粘'],\
+                    ['浅白', '蜷缩', '浊响', '模糊', '平坦', '硬滑'],\
+                    ['青绿', '蜷缩', '沉闷', '稍糊', '稍凹', '硬滑']]
+    attrlabels = ['色泽', '根蒂', '敲击', '纹理', '脐部', '触感']
+    density = [0.697, 0.774, 0.634, 0.403, 0.481, 0.437, 0.243, 0.343, 0.639, 0.657, 0.360, 0.593, 0.719]  #密度
+    sugarCont = [0.460, 0.376, 0.264, 0.237, 0.149, 0.211, 0.267, 0.099, 0.161, 0.198, 0.370, 0.042, 0.103]  #含糖率
+    classVec = [1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0]
+
+    return watermelonList, density, sugarCont, classVec
+
+def parameterVal(parameter,classVec):
+    good=[]
+    bad=[]
+    for i in range(len(parameter)):
+        if classVec[i] == 1:
+            good.append(parameter[i])
+        else:
+            bad.append(parameter[i])
+    mu_g = mean(mat(good))  #好瓜的均值
+    mu_b = mean(mat(bad))   #坏瓜的均值
+    sigma_g = sqrt(var(mat(good)))  #好瓜的标准差
+    sigma_b = sqrt(var(mat(bad)))   #坏瓜的标准差
+    return mu_g, mu_b, sigma_g, sigma_b, good, bad
+
+def gauss(x,mu,sigma):
+    return (1/(sqrt(2*pi)*sigma))*exp(-((x-mu)**2)/(2*sigma**2))
+
+def createAttrList(dataSet):
+    attrSet = set([])
+    for sample in dataSet:
+        attrSet = attrSet | set(sample)
+    return list(attrSet)
+
+
+def setOfAttr2Vec(attrList, inputSet):
+    returnVec = [0] * len(attrList)
+    for word in inputSet:
+        if word in attrList:
+            returnVec[attrList.index(word)] = 1
+    return returnVec
+
+def trainNB0(trainMatrix, trainCategory):
+    numTrainSam = len(trainMatrix)
+    numAttr = len(trainMatrix[0])
+    pGood = (sum(trainCategory)+1)/ float(numTrainSam+2)  #先验概率
+    pBad = (numTrainSam-sum(trainCategory)+1)/float(numTrainSam+2)
+    p0Num = ones(numAttr)
+    p1Num = ones(numAttr)
+    for i in range(numTrainSam):
+        if trainCategory[i] == 1:
+            p1Num += trainMatrix[i]
+        else:
+            p0Num += trainMatrix[i]
+    p1Vect = log(p1Num / (sum(trainCategory)+2))               #1类别条件概率
+    p0Vect = log(p0Num / (numTrainSam-sum(trainCategory)+2))   #0类别条件概率
+    return p0Vect, p1Vect, pGood,pBad
+
+def calGauss(gaussVal):
+    return sum(log(gaussVal))
+
+def classifyNB(vec2Classify, p0Vec, p1Vec, pClass1,pClass0,densityGFunc,densityBFunc,sugarContGFunc,sugarContBFunc):
+    p1 = sum(vec2Classify * p1Vec) + log(pClass1) + densityGFunc + sugarContGFunc  #1类后验概率
+    p0 = sum(vec2Classify * p0Vec) + log(pClass0) + densityBFunc + sugarContBFunc  #0类后验概率
+    if p1 > p0:
+        return 1
+    else:
+        return 0
+
+def testDataSet():
+    #测试数据集
+    testList=[['青绿', '蜷缩', '沉闷', '清晰', '凹陷', '硬滑'],\
+              ['浅白', '蜷缩', '浊响', '清晰', '凹陷', '硬滑'],\
+              ['乌黑', '稍蜷', '沉闷', '稍糊', '稍凹', '硬滑'],\
+              ['浅白', '硬挺', '清脆', '模糊', '平坦', '硬滑']]
+    classLabel=[1, 1, 0, 0]
+    densityTest = [0.608, 0.556, 0.666, 0.245]  #密度
+    sugarContTest = [0.318, 0.215, 0.091, 0.057]  #含糖率
+    return testList, densityTest, sugarContTest, classLabel
+
+
+def trainingNB():
+    watermelonList, density, sugarCont, classVec = loadDataSet()
+    myAttrList = createAttrList(watermelonList)
+    trainMat = []
+    testLabel=[]
+    for waterSam in watermelonList:
+        trainMat.append(setOfAttr2Vec(myAttrList, waterSam))
+    p0V, p1V, pGo, pBa = trainNB0(array(trainMat), array(classVec))
+    mu_dg, mu_db, sigma_dg, sigma_db, dgood, dbad = parameterVal(density, classVec)
+    mu_sg, mu_sb, sigma_sg, sigma_sb, sgood, sbad = parameterVal(sugarCont, classVec)
+    d_gaussGVal = gauss(dgood, mu_dg, sigma_dg)
+    d_gaussBVal = gauss(dbad, mu_db, sigma_db)
+    s_gaussGVal = gauss(sgood, mu_sg, sigma_sg)
+    s_gaussBVal = gauss(sbad, mu_sb, sigma_sb)
+    densityGFunc = calGauss(d_gaussGVal)
+    densityBFunc = calGauss(d_gaussBVal)
+    sugarContGFunc = calGauss(s_gaussGVal)
+    sugarContBFunc = calGauss(s_gaussBVal)
+    m = len(watermelonList)
+    for i in range(m):
+        thisWel=array(setOfAttr2Vec(myAttrList, watermelonList[i]))
+        flag = classifyNB(thisWel, p0V, p1V, pGo, pBa, densityGFunc, densityBFunc, sugarContGFunc, sugarContBFunc)
+        testLabel.append(flag)
+        if flag == 1:
+            print("、".join(watermelonList[i]) + "、密度:" + str(density[i]) + "、含糖率:" + str(sugarCont[i]) + " 是好瓜")
+        else:
+            print("、".join(watermelonList[i]) + "、密度:" + str(density[i]) + "、含糖率:" + str(sugarCont[i]) + " 是坏瓜")
+    errorEst = multiply(sign(mat(testLabel).T) != mat(classVec).T,ones((len(classVec),1)))
+    errorRate = errorEst.sum()/len(classVec)
+    print("基于训练集的贝叶斯分类器的错误率为:",'%.4f\n'%errorRate)
+
+def testingNB():
+    watermelonList, density, sugarCont, classVec = loadDataSet()
+    myAttrList = createAttrList(watermelonList)
+    trainMat = []
+    testLabel=[]
+    for waterSam in watermelonList:
+        trainMat.append(setOfAttr2Vec(myAttrList, waterSam))
+    p0V, p1V, pGo, pBa = trainNB0(array(trainMat), array(classVec))
+    testList, densityTest, sugarContTest, classLabel = testDataSet()
+    mu_dg, mu_db, sigma_dg, sigma_db, dgood, dbad = parameterVal(densityTest, classLabel)
+    mu_sg, mu_sb, sigma_sg, sigma_sb, sgood, sbad = parameterVal(sugarContTest, classLabel)
+    d_gaussGVal = gauss(dgood, mu_dg, sigma_dg)
+    d_gaussBVal = gauss(dbad, mu_db, sigma_db)
+    s_gaussGVal = gauss(sgood, mu_sg, sigma_sg)
+    s_gaussBVal = gauss(sbad, mu_sb, sigma_sb)
+    densityGFunc = calGauss(d_gaussGVal)
+    densityBFunc = calGauss(d_gaussBVal)
+    sugarContGFunc = calGauss(s_gaussGVal)
+    sugarContBFunc = calGauss(s_gaussBVal)
+    m = len(testList)
+    for i in range(m):
+        thisWel = array(setOfAttr2Vec(myAttrList, testList[i]))
+        flag = classifyNB(thisWel, p0V, p1V, pGo, pBa, densityGFunc,densityBFunc, sugarContGFunc, sugarContBFunc)
+        testLabel.append(flag)
+        if flag == 1:
+            print("、".join(watermelonList[i]) + "、密度:" + str(densityTest[i]) + "、含糖率:" + str(sugarContTest[i]) + " 是好瓜")
+        else:
+            print("、".join(watermelonList[i]) + "、密度:" + str(densityTest[i]) + "、含糖率:" + str(sugarContTest[i]) + " 是坏瓜")
+    errorEst = multiply(sign(mat(testLabel).T) != mat(classLabel).T,ones((len(classLabel),1)))
+    errorRate = errorEst.sum()/len(classLabel)
+    print("基于测试集的贝叶斯分类器的错误率为:",'%.4f\n'%errorRate)
+
+if __name__=="__main__":
+    trainingNB()
+    testingNB()
